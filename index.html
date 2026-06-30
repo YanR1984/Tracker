@@ -248,6 +248,7 @@ const DEFAULT={categories:[
 
 let weekOffset=0;
 let openCats={};
+let openSubtasks={}; // tracks expanded/collapsed state per parent task, default expanded
 let addingTo=null;
 let editingTask=null;
 let openHistWeeks={};
@@ -460,13 +461,18 @@ document.getElementById('note-modal').addEventListener('click',function(e){if(e.
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
 
 // ---- RENDER ----
+let _renderGen=0;
 async function render(){
+  const myGen=++_renderGen;
+  const myWeekOffset=weekOffset; // capture the week this render is FOR
   const data=await loadStruct();
-  const checks=await loadChk();
-  const notes=await loadNotes();
-  const prevNotes=await loadNotes(weekOffset-1);
-  const ponctual=await loadPonctual();
-  const dates=getWeekDates();
+  const checks=await loadChk(myWeekOffset);
+  const notes=await loadNotes(myWeekOffset);
+  const prevNotes=await loadNotes(myWeekOffset-1);
+  const ponctual=await loadPonctual(myWeekOffset);
+  // If another render started after this one (user navigated again), abort — don't overwrite newer data
+  if(myGen!==_renderGen)return;
+  const dates=getWeekDates(myWeekOffset);
 
   // Merge ponctual tasks into a virtual render copy (this week only)
   const renderData=JSON.parse(JSON.stringify(data));
@@ -611,6 +617,8 @@ async function render(){
           subs.forEach(sub=>{const sd=getScheduledDays(sub.days&&sub.days.length?sub:{days:task.days});sd.forEach(d=>{pt++;if(checks[cid(cat.id,task.id,d,sub.id)])pd++;});});
           const pp=pt?Math.round(pd/pt*100):0;
           const parentReached=pd>=pt&&pt>0;
+          const subKey=cat.id+'_'+task.id;
+          const subsOpen=openSubtasks[subKey]!==false; // default expanded
 
           // Today column for parent: check if all subtasks scheduled today are done
           const todayIdx2=dates.findIndex(d=>d.toDateString()===today.toDateString());
@@ -628,29 +636,35 @@ async function render(){
             parentTodayCell=`<td class="pct-cell" style="color:${color};font-size:12px;font-weight:600">${todaySubDone}/${todaySubTotal}</td>`;
           }
 
-          tbody+=`<tr><td class="tname" style="font-weight:600">${task.name}<span class="freq-badge ${parentReached?'reached':''}">${pd}/${pt}</span>${poncBadge}</td>`;
+          const collapseBtn=`<button class="icon-btn" onclick="toggleSubtasks('${subKey}')" title="${subsOpen?'Réduire':'Étendre'} les sous-tâches" style="color:#999;font-size:11px;margin-right:2px">${subsOpen?'&#9660;':'&#9658;'}</button>`;
+
+          tbody+=`<tr><td class="tname" style="font-weight:600">${collapseBtn}${task.name}<span class="freq-badge ${parentReached?'reached':''}">${pd}/${pt}</span>${poncBadge}</td>`;
           for(let d=0;d<7;d++)tbody+=`<td style="background:#fafaf8"></td>`;
           tbody+=`${parentTodayCell}<td class="pct-cell">${pp}%</td><td class="action-cell">
             ${editBtn}${delBtn}
           </td></tr>`;
           if(isEditing)tbody+=editRowHtml(cat.id,task.id,null,task.name,taskDays);
-          subs.forEach(sub=>{
-            const subDays=getScheduledDays(sub.days&&sub.days.length?sub:{days:task.days});
-            let sn=0;subDays.forEach(d=>{if(checks[cid(cat.id,task.id,d,sub.id)])sn++;});
-            const isEditSub=editingTask&&editingTask.catId===cat.id&&editingTask.taskId===task.id&&editingTask.subId===sub.id;
-            tbody+=`<tr class="subrow"><td class="tname sub">${sub.name}<span class="freq-badge ${sn>=subDays.length&&subDays.length>0?'reached':''}">${sn}/${subDays.length}</span></td>`;
-            for(let d=0;d<7;d++){
-              if(subDays.includes(d)) tbody+=chkCell(cat.id,task.id,d,sub.id,sub.name);
-              else tbody+=`<td class="unscheduled"><span class="dash">&middot;</span></td>`;
-            }
-            tbody+=todayCell(cat.id,task.id,sub.id,subDays);
-            tbody+=`<td class="pct-cell">${subDays.length?Math.round(sn/subDays.length*100):0}%</td><td class="action-cell">
-              <button class="icon-btn edit" onclick="startEdit('${cat.id}','${task.id}','${sub.id}')">&#9998;</button>
-              <button class="icon-btn del" onclick="delSub('${cat.id}','${task.id}','${sub.id}')">&#10005;</button>
-            </td></tr>`;
-            if(isEditSub)tbody+=editRowHtml(cat.id,task.id,sub.id,sub.name,subDays);
-          });
-          tbody+=`<tr><td colspan="11" style="padding:6px 16px 6px 32px;background:#fafaf8"><button onclick="showAddSub('${cat.id}','${task.id}')" style="font-size:11px;border:none;background:none;color:#aaa;cursor:pointer;padding:0">+ sous-tâche</button></td></tr>`;
+          if(subsOpen){
+            subs.forEach(sub=>{
+              const subDays=getScheduledDays(sub.days&&sub.days.length?sub:{days:task.days});
+              let sn=0;subDays.forEach(d=>{if(checks[cid(cat.id,task.id,d,sub.id)])sn++;});
+              const isEditSub=editingTask&&editingTask.catId===cat.id&&editingTask.taskId===task.id&&editingTask.subId===sub.id;
+              tbody+=`<tr class="subrow"><td class="tname sub">${sub.name}<span class="freq-badge ${sn>=subDays.length&&subDays.length>0?'reached':''}">${sn}/${subDays.length}</span></td>`;
+              for(let d=0;d<7;d++){
+                if(subDays.includes(d)) tbody+=chkCell(cat.id,task.id,d,sub.id,sub.name);
+                else tbody+=`<td class="unscheduled"><span class="dash">&middot;</span></td>`;
+              }
+              tbody+=todayCell(cat.id,task.id,sub.id,subDays);
+              tbody+=`<td class="pct-cell">${subDays.length?Math.round(sn/subDays.length*100):0}%</td><td class="action-cell">
+                <button class="icon-btn edit" onclick="startEdit('${cat.id}','${task.id}','${sub.id}')">&#9998;</button>
+                <button class="icon-btn del" onclick="delSub('${cat.id}','${task.id}','${sub.id}')">&#10005;</button>
+              </td></tr>`;
+              if(isEditSub)tbody+=editRowHtml(cat.id,task.id,sub.id,sub.name,subDays);
+            });
+            tbody+=`<tr><td colspan="11" style="padding:6px 16px 6px 32px;background:#fafaf8"><button onclick="showAddSub('${cat.id}','${task.id}')" style="font-size:11px;border:none;background:none;color:#aaa;cursor:pointer;padding:0">+ sous-tâche</button></td></tr>`;
+          } else {
+            tbody+=`<tr><td colspan="11" style="padding:4px 16px 4px 32px;background:#fafaf8"><span style="font-size:11px;color:#bbb">${subs.length} sous-tâche${subs.length>1?'s':''} masquée${subs.length>1?'s':''} — <button onclick="toggleSubtasks('${subKey}')" style="font-size:11px;border:none;background:none;color:#999;cursor:pointer;padding:0;text-decoration:underline">afficher</button></span></td></tr>`;
+          }
         } else {
           let n=0;taskDays.forEach(d=>{if(checks[cid(cat.id,task.id,d)])n++;});
           const tp=taskDays.length?Math.round(n/taskDays.length*100):0;
@@ -736,6 +750,8 @@ async function render(){
       </div></div>`;
   }
   html+=`<div style="margin-top:8px"><button onclick="showAddCat()">+ Ajouter une catégorie</button></div>`;
+  // Final guard: if a newer render has started, don't write stale DOM
+  if(myGen!==_renderGen)return;
   cont.innerHTML=html;
   requestAnimationFrame(()=>{
     const el=document.getElementById('et-name')||document.getElementById('nt')||document.getElementById('ns')||document.getElementById('nc');
@@ -853,6 +869,7 @@ async function moveCat(catId,dir){
   saveStruct(data);await rerender();
 }
 async function toggleCat(id){openCats[id]=openCats[id]===false?true:false;await rerender();}
+async function toggleSubtasks(key){openSubtasks[key]=openSubtasks[key]===false?true:false;await rerender();}
 async function changeWeek(d){
   weekOffset+=d;
   addingTo=null;editingTask=null;
