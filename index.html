@@ -421,6 +421,48 @@ async function archiveCurrentWeek(){
   saveArchive(arch);
 }
 
+// Returns the Monday date (YYYY-MM-DD) of the week that offset 0 SHOULD represent right now
+function currentWeekMondayStr(){
+  return getWeekDates(0)[0].toISOString().slice(0,10);
+}
+
+// Detects if "week 0" data is stale (belongs to a past week) and rotates it automatically:
+// archives it under its real date, then clears tr_c4_0/tr_n4_0/tr_p4_0 so the new week starts empty.
+// This runs once on load, before anything is rendered.
+async function rotateWeekIfNeeded(){
+  const marker=await gsGet('tr_week_marker');
+  const expectedMonday=currentWeekMondayStr();
+  if(marker===expectedMonday){
+    return; // already up to date, nothing to do
+  }
+  // marker is missing or stale — figure out what week "0" currently holds and archive it properly
+  if(marker){
+    const data=await loadStruct();
+    const checks0=await loadChk(0);
+    const notes0=await loadNotes(0);
+    const hasData=Object.keys(checks0).length>0||Object.keys(notes0).length>0;
+    if(hasData){
+      // Reconstruct the dates for the STALE week (the one the old marker pointed to)
+      const staleMonday=new Date(marker+'T00:00:00');
+      const staleDates=Array.from({length:7},(_,i)=>{const d=new Date(staleMonday);d.setDate(staleMonday.getDate()+i);return d;});
+      const s=computeStats(data,checks0);
+      const arch=await loadArchive();
+      const dateStr=marker;
+      const existing=arch.findIndex(w=>w.date===dateStr);
+      const entry={date:dateStr,label:fmt(staleDates[0])+' – '+fmt(staleDates[6]),year:staleDates[0].getFullYear(),month:staleDates[0].getMonth(),pct:s.pct,don:s.don,tot:s.tot,bycat:s.bycat,notes:notes0};
+      if(existing>=0)arch[existing]=entry;else arch.push(entry);
+      arch.sort((a,b)=>a.date.localeCompare(b.date));
+      saveArchive(arch);
+    }
+    // Clear week 0 — it's now a fresh week
+    await gsDel(ck(0));
+    await gsDel(nk(0));
+    await gsDel(ponctualKey(0));
+  }
+  // Update marker to today's week
+  gsSet('tr_week_marker',expectedMonday);
+}
+
 // ---- TABS ----
 async function switchTab(id){
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['tracker','history'][i]===id));
@@ -1077,6 +1119,7 @@ let _appReady=false;
     if(statusEl)statusEl.textContent=steps[step];
   },700);
 
+  await rotateWeekIfNeeded();
   await archiveCurrentWeek();
   await render();
   _appReady=true;
