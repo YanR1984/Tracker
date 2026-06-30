@@ -575,7 +575,7 @@ async function render(){
           // note edit button (shown on hover via CSS, only when checked or has prev note)
           const noteBtn=`<button class="note-btn" onclick="openNoteModal('${catId}','${taskId}',${dayIdx},${subId?`'${subId}'`:'null'},'${tname}','${dayName}')" title="${hasNote?'Modifier la note':'Ajouter une note'}">✎</button>`;
           let inner=`<div class="chk-wrap">
-            <input type="checkbox" ${checked?'checked':''} ${fut?'disabled':''} onchange="toggleChk('${catId}','${taskId}',${dayIdx},${subId?`'${subId}'`:'null'},'${tname}','${dayName}',this)">
+            <input type="checkbox" ${checked?'checked':''} ${fut?'disabled':''} onchange="toggleChk('${catId}','${taskId}',${dayIdx},${subId?`'${subId}'`:'null'},'${tname}','${dayName}',this,${weekOffset})">
             ${hasNote?`<span class="note-dot"></span>`:''}
             ${hasPrevNote&&!hasNote?`<span class="has-note-prev"></span>`:''}
             ${!fut?noteBtn:''}
@@ -759,14 +759,19 @@ function editRowHtml(catId,taskId,subId,currentName,currentDays){
   </td></tr>`;
 }
 
-async function toggleChk(catId,taskId,dayIdx,subId,taskName,dayName,el){
-  const c=await loadChk();
+async function toggleChk(catId,taskId,dayIdx,subId,taskName,dayName,el,renderedWeekOffset){
+  // Use the weekOffset that was active when this checkbox was rendered, not the current one
+  const targetOffset=renderedWeekOffset!==undefined?renderedWeekOffset:weekOffset;
+  const c=await loadChk(targetOffset);
   const id=cid(catId,taskId,dayIdx,subId||null);
   c[id]=el.checked;
   if(!c[id])delete c[id];
-  saveChk(c); // instant
-  archiveCurrentWeek(); // background, no await
-  const _sy=window.scrollY;await render();window.scrollTo({top:_sy,behavior:'instant'});
+  saveChk(c,targetOffset); // instant
+  if(targetOffset===0)archiveCurrentWeek(); // background, no await
+  // Only rerender if we're still viewing the same week
+  if(targetOffset===weekOffset){
+    const _sy=window.scrollY;await render();window.scrollTo({top:_sy,behavior:'instant'});
+  }
 }
 
 // ---- HISTORY RENDER ----
