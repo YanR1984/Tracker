@@ -157,6 +157,13 @@ td.unscheduled{background:#fafaf8}
   <div class="load-quote" id="load-quote-txt"></div>
 </div>
 
+<!-- UNDO TOAST -->
+<div id="undo-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;font-size:13px;padding:10px 16px;border-radius:10px;z-index:999;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.2)">
+  <span id="undo-label"></span>
+  <button onclick="undoDelete()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit">↩ Annuler</button>
+  <button onclick="hideUndoToast()" style="background:none;color:#888;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1">✕</button>
+</div>
+
 <div class="app" id="main-app" style="opacity:0;transition:opacity .5s ease">
   <div class="tabs">
     <div class="tab active" onclick="switchTab('tracker')">Semaine</div>
@@ -592,6 +599,7 @@ async function render(){
         <div style="display:flex;flex-direction:column;padding:0 10px;gap:1px;flex-shrink:0">
           <button onclick="moveCat('${cat.id}',-1)" title="Monter" style="padding:2px 6px;font-size:11px;line-height:1;border-radius:4px;${renderData.categories.indexOf(cat)===0?'opacity:.2;cursor:default':''}">▲</button>
           <button onclick="moveCat('${cat.id}',1)" title="Descendre" style="padding:2px 6px;font-size:11px;line-height:1;border-radius:4px;${renderData.categories.indexOf(cat)===renderData.categories.length-1?'opacity:.2;cursor:default':''}">▼</button>
+          <button onclick="delCat('${cat.id}')" title="Supprimer la catégorie" style="padding:2px 6px;font-size:11px;line-height:1;border-radius:4px;color:#E24B4A;border-color:#E24B4A">✕</button>
         </div>
       </div>
       <div class="cat-bar-outer"><div class="cat-bar-inner" style="width:${cs.pct}%;background:${cat.color}"></div></div>`;
@@ -902,6 +910,51 @@ function scrollY_(){return window.scrollY;}
 function scrollTo_(y){window.scrollTo({top:y,behavior:'instant'});}
 async function rerender(){const y=scrollY_();await render();scrollTo_(y);}
 
+// ---- UNDO ----
+let _undoSnapshot=null;
+let _undoLabel='';
+let _undoTimer=null;
+
+async function saveUndoSnapshot(label){
+  const data=await loadStruct();
+  _undoSnapshot=JSON.parse(JSON.stringify(data));
+  _undoLabel=label;
+  // Show undo toast for 10 seconds
+  clearTimeout(_undoTimer);
+  showUndoToast();
+  _undoTimer=setTimeout(()=>{_undoSnapshot=null;hideUndoToast();},10000);
+}
+
+function showUndoToast(){
+  let t=document.getElementById('undo-toast');
+  let l=document.getElementById('undo-label');
+  if(!t)return;
+  if(l)l.textContent=`"${_undoLabel}" supprimé`;
+  t.style.display='flex';
+}
+
+function hideUndoToast(){
+  const t=document.getElementById('undo-toast');
+  if(t)t.style.display='none';
+}
+
+async function undoDelete(){
+  if(!_undoSnapshot)return;
+  saveStruct(_undoSnapshot);
+  _undoSnapshot=null;
+  clearTimeout(_undoTimer);
+  hideUndoToast();
+  await rerender();
+}
+
+async function delCat(catId){
+  if(!confirm('Supprimer cette catégorie et toutes ses tâches?'))return;
+  const data=await loadStruct();
+  const cat=data.categories.find(c=>c.id===catId);
+  await saveUndoSnapshot(cat?cat.name:'Catégorie');
+  data.categories=data.categories.filter(c=>c.id!==catId);
+  saveStruct(data);await rerender();
+}
 async function moveCat(catId,dir){
   const data=await loadStruct();
   const idx=data.categories.findIndex(c=>c.id===catId);
@@ -951,8 +1004,17 @@ async function saveEdit(catId,taskId,subId,pf){
   const data=await loadStruct();
   const cat=data.categories.find(c=>c.id===catId);if(!cat)return;
   const task=cat.tasks.find(t=>t.id===taskId);if(!task)return;
-  if(subId){const sub=task.subtasks.find(s=>s.id===subId);if(!sub)return;sub.name=name.trim();sub.days=days;}
-  else{task.name=name.trim();task.days=days;}
+  if(subId){
+    const sub=task.subtasks.find(s=>s.id===subId);if(!sub)return;
+    sub.name=name.trim();sub.days=days;
+  } else {
+    task.name=name.trim();
+    task.days=days;
+    // Always cascade new days to ALL subtasks (they inherit parent days by default)
+    if(task.subtasks&&task.subtasks.length>0){
+      task.subtasks.forEach(sub=>{sub.days=[...days];});
+    }
+  }
   saveStruct(data);editingTask=null;await rerender();
 }
 // Ponctual tasks stored per-week alongside checks
@@ -1002,6 +1064,8 @@ async function delPonctual(taskId){
 async function delTask(catId,taskId){
   if(!confirm('Supprimer cette tâche?'))return;
   const data=await loadStruct();const cat=data.categories.find(c=>c.id===catId);
+  const task=cat?cat.tasks.find(t=>t.id===taskId):null;
+  await saveUndoSnapshot(task?task.name:'Tâche');
   if(cat)cat.tasks=cat.tasks.filter(t=>t.id!==taskId);
   saveStruct(data);await rerender();
 }
@@ -1009,6 +1073,8 @@ async function delSub(catId,taskId,subId){
   if(!confirm('Supprimer cette sous-tâche?'))return;
   const data=await loadStruct();const cat=data.categories.find(c=>c.id===catId);if(!cat)return;
   const task=cat.tasks.find(t=>t.id===taskId);
+  const sub=task?task.subtasks.find(s=>s.id===subId):null;
+  await saveUndoSnapshot(sub?sub.name:'Sous-tâche');
   if(task&&task.subtasks)task.subtasks=task.subtasks.filter(s=>s.id!==subId);
   saveStruct(data);await rerender();
 }
