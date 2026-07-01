@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YANOS — War Map Mission 2 semaines</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;color:#e8f4ff;font-family:monospace;min-height:100vh;padding:0}
+#hq{max-width:960px;margin:0 auto;padding:12px}
+@keyframes hg-blink{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes hg-sld{from{background-position:0 0}to{background-position:0 6px}}
+@keyframes hg-flick{0%,100%{opacity:.55}47%{opacity:.5}50%{opacity:.65}53%{opacity:.5}}
+
+/* TOP BAR */
+#top-bar{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  padding:16px 20px;
+  background:linear-gradient(135deg,#0d1a2e 0%,#0a1220 60%,#0d1a2e 100%);
+  border:1px solid #00d4ff44;border-radius:10px;margin-bottom:10px;
+  box-shadow:0 0 30px #00d4ff0d,inset 0 1px 0 #00d4ff22;
+}
+#top-bar::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,#00d4ff88,transparent);
+}
+#top-bar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,#00d4ff33,transparent);
+}
+#title-block{display:flex;flex-direction:column;gap:4px}
+#title-hq{
+  color:#00d4ff;font-size:15px;letter-spacing:.18em;font-weight:700;
+  text-shadow:0 0 12px #00d4ff66;
+  display:flex;align-items:center;gap:8px;
+}
+#title-hq .diamond{font-size:10px;color:#00d4ff88;animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+#title-sub{font-size:9px;color:#7a9abf;letter-spacing:.2em;padding-left:2px}
+#stats-row{display:flex;gap:8px;flex-wrap:wrap}
+.schip{
+  display:flex;flex-direction:column;align-items:center;
+  background:#060e1c;
+  border:1px solid #00d4ff22;border-radius:7px;
+  padding:6px 14px;min-width:70px;
+  position:relative;overflow:hidden;transition:.2s;
+}
+.schip:hover{border-color:#00d4ff55;background:#0a1628}
+.schip::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00d4ff44,transparent)}
+.schip-val{font-size:18px;font-weight:700;color:#00d4ff;line-height:1;text-shadow:0 0 10px #00d4ff55}
+.schip-val.amber{color:#ffaa00;text-shadow:0 0 10px #ffaa0055}
+.schip-val.red{color:#ff3344;text-shadow:0 0 10px #ff334455}
+.schip-lbl{font-size:9px;color:#7a9abf;letter-spacing:.08em;margin-top:3px;text-transform:uppercase}
+
+/* MAP */
+#map-wrap{position:relative;height:260px;background:#03060f;border:1px solid #3b82f644;border-radius:10px;overflow:hidden;margin-bottom:10px}
+#chains-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#pions-wrap{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.pion{position:absolute;transform:translate(-50%,-50%);transition:left .8s cubic-bezier(.4,0,.2,1),top .8s cubic-bezier(.4,0,.2,1);z-index:20}
+.pion svg{filter:drop-shadow(0 0 6px var(--glow,#00d4ff))}
+
+/* CLUSTERS */
+#war-map{display:flex;flex-direction:column;gap:8px}
+.cluster{background:#0d1525;border:1px solid #1a2a40;border-radius:8px;overflow:hidden;transition:border-color .4s}
+.cluster.dl-warn{border-color:#ffaa0055}
+.cluster.dl-danger{border-color:#ff334466;animation:dl-pulse 2.5s ease-in-out infinite}
+.cluster.dl-over{border-color:#ff334499;animation:dl-pulse 1.5s ease-in-out infinite}
+@keyframes dl-pulse{0%,100%{border-color:#ff334466}50%{border-color:#ff3344cc}}
+.dl-bar{height:3px;width:100%;background:#1a2a40;transition:background .4s}
+.dl-bar.dl-ok{background:linear-gradient(90deg,#00ff8844,#00ff8822)}
+.dl-bar.dl-warn{background:linear-gradient(90deg,#ffaa0088,#ffaa0033)}
+.dl-bar.dl-danger{background:linear-gradient(90deg,#ff334499,#ff334433)}
+.dl-bar.dl-over{background:#ff334488}
+.dl-badge{font-size:9px;padding:2px 7px;border-radius:3px;letter-spacing:.05em;white-space:nowrap;font-family:monospace;cursor:pointer;transition:.2s}
+.dl-badge.dl-ok{background:#00ff8818;color:#00ff88;border:1px solid #00ff8833}
+.dl-badge.dl-warn{background:#ffaa0018;color:#ffaa00;border:1px solid #ffaa0044}
+.dl-badge.dl-danger{background:#ff334422;color:#ff3344;border:1px solid #ff334455}
+.dl-badge.dl-over{background:#ff334433;color:#ff3344;border:1px solid #ff334477;animation:dl-pulse 1.5s ease-in-out infinite}
+.dl-badge.dl-none{background:#1a2a40;color:#7a9abf;border:1px solid #2a3a50}
+.dl-date-inp{background:#060e1c;border:1px solid #00d4ff44;border-radius:4px;padding:2px 6px;color:#e8f4ff;font-size:11px;font-family:monospace;cursor:pointer}
+.dl-date-inp:focus{outline:none;border-color:#00d4ff}
+.cluster-hdr{display:flex;align-items:center;gap:10px;padding:8px 14px;border-left:4px solid #3a5a7b;cursor:pointer;user-select:none}
+.cluster-hdr.cyan{border-left-color:#00d4ff}
+.cluster-hdr.amber{border-left-color:#ffaa00}
+.cluster-hdr.green{border-left-color:#00ff88}
+.cluster-meta{display:flex;flex-direction:column;flex:1;gap:2px}
+.cluster-name{font-size:13px;color:#e8f4ff;font-weight:500}
+.cluster-sub{font-size:10px;color:#7a9abf;letter-spacing:.08em}
+.cluster-prog{font-size:10px;color:#7a9abf;margin-left:auto}
+.cluster-toggle{color:#7a9abf;font-size:14px;transition:.2s;margin-left:8px}
+.cluster.collapsed .cluster-toggle{transform:rotate(-90deg)}
+
+/* TASK LIST */
+.task-list{padding:4px 0 8px}
+.task-list.hidden{display:none}
+.trow{display:flex;align-items:center;gap:8px;padding:5px 14px 5px 14px;cursor:pointer;transition:.1s;position:relative;user-select:none}
+.trow:hover{background:#101d30}
+.trow.locked{opacity:.5;cursor:default}
+.trow.done .tlabel{text-decoration:line-through;color:#5a7a9b}
+.trow.dragging{opacity:.5;background:#00d4ff11}
+.trow.drag-over{border-top:2px solid #00d4ff}
+.drag-handle{color:#5a7a9b;font-size:14px;cursor:grab;padding:0 4px;flex-shrink:0}
+.drag-handle:active{cursor:grabbing}
+.tdot{width:13px;height:13px;border-radius:50%;border:2px solid #5a7a9b;background:#0a0e1a;flex-shrink:0;transition:.25s}
+.tlabel{font-size:12px;color:#d0e4f4;flex:1;line-height:1.35}
+.client-badge{font-size:9px;padding:2px 6px;border-radius:3px;letter-spacing:.04em;white-space:nowrap;flex-shrink:0}
+.badge-d{background:#00d4ff18;color:#00d4ff;border:1px solid #00d4ff33}
+.badge-s{background:#ffaa0018;color:#ffaa00;border:1px solid #ffaa0033}
+.wait-badge{font-size:9px;padding:2px 6px;border-radius:3px;background:#8844ff18;color:#aa77ff;border:1px solid #8844ff44;white-space:nowrap;letter-spacing:.04em}
+.ubadge{font-size:9px;padding:2px 5px;border-radius:3px;background:#ff334418;color:#ff3344;border:1px solid #ff334433;white-space:nowrap}
+.task-actions{display:flex;gap:4px;flex-shrink:0}
+.icon-btn{background:none;border:none;color:#5a7a9b;cursor:pointer;font-size:13px;padding:1px 3px;line-height:1;transition:.15s;border-radius:3px}
+.icon-btn:hover{color:#ff3344;background:#ff334418}
+
+/* ADD ROW */
+.add-row{display:flex;align-items:center;gap:6px;padding:6px 14px;border-top:1px solid #101d30}
+.add-inp{flex:1;background:#101d30;border:1px solid #00d4ff22;border-radius:5px;padding:5px 9px;color:#e8f4ff;font-size:12px;font-family:monospace;min-width:0}
+.add-inp:focus{outline:none;border-color:#00d4ff}
+.add-inp::placeholder{color:#5a7a9b}
+.urg-btn{background:#101d30;border:1px solid #ff334455;border-radius:5px;padding:4px 8px;color:#7a9abf;font-size:11px;cursor:pointer;font-family:monospace;white-space:nowrap;transition:.2s}
+.urg-btn.on{background:#ff334422;color:#ff3344;border-color:#ff3344}
+.client-sel{background:#101d30;border:1px solid #00d4ff22;border-radius:5px;padding:4px 6px;color:#b0cce0;font-size:11px;font-family:monospace}
+.add-btn-sm{background:#00d4ff22;border:1px solid #00d4ff44;border-radius:5px;padding:4px 10px;color:#00d4ff;font-size:11px;cursor:pointer;font-family:monospace;white-space:nowrap;transition:.15s}
+.add-btn-sm:hover{background:#00d4ff44}
+
+/* PROGRESS */
+#pgbar-wrap{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#0d1525;border:1px solid #00d4ff22;border-radius:8px;margin-top:10px}
+#pgbar{flex:1;height:4px;background:#101d30;border-radius:2px;overflow:hidden}
+#pgfill{height:4px;background:#00d4ff;width:0%;transition:width .5s}
+.pglbl-txt{font-size:9px;color:#7a9abf;letter-spacing:.08em}
+#pglbl{font-size:10px;color:#00d4ff;min-width:30px;text-align:right}
+
+/* WIN BANNER */
+.win-banner{display:none;background:#00ff8814;border:1px solid #00ff8844;border-radius:6px;padding:8px 14px;margin:6px 14px;font-size:11px;color:#00ff88;text-align:center;letter-spacing:.06em}
+.win-banner.show{display:block}
+
+/* EDIT INLINE */
+.edit-inp{background:#060e1c;border:1px solid #00d4ff55;border-radius:4px;padding:3px 7px;color:#e8f4ff;font-size:12px;font-family:monospace;min-width:0;flex:1}
+.edit-inp:focus{outline:none;border-color:#00d4ff}
+.icon-btn-edit{background:none;border:none;color:#7a9abf;cursor:pointer;font-size:12px;padding:1px 4px;border-radius:3px;transition:.15s;line-height:1}
+.icon-btn-edit:hover{color:#00d4ff;background:#00d4ff18}
+
+/* COULEUR CLUSTER EDIT */
+.col-sel{background:#060e1c;border:1px solid #00d4ff22;border-radius:4px;padding:3px 5px;color:#b0cce0;font-size:11px;font-family:monospace}
+
+/* ADD CLUSTER */
+#add-cluster-wrap{padding:8px 0 4px;display:flex;justify-content:center}
+#add-cluster-btn{background:#00d4ff0d;border:1px dashed #00d4ff66;border-radius:7px;padding:7px 20px;color:#7a9abf;font-size:11px;cursor:pointer;font-family:monospace;letter-spacing:.08em;transition:.2s;width:100%}
+#add-cluster-btn:hover{background:#00d4ff1a;color:#00d4ff;border-color:#00d4ffaa}
+
+/* MODAL */
+#modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:200}
+#modal-bg.open{display:flex}
+#modal-box{background:#0d1525;border:1px solid #00d4ff44;border-radius:10px;padding:20px;width:320px;display:flex;flex-direction:column;gap:10px}
+#modal-box h3{font-size:13px;color:#00d4ff;letter-spacing:.1em;margin:0}
+#modal-box input,#modal-box select{background:#060e1c;border:1px solid #00d4ff33;border-radius:5px;padding:7px 10px;color:#e8f4ff;font-size:12px;font-family:monospace;width:100%}
+#modal-box input:focus,#modal-box select:focus{outline:none;border-color:#00d4ff}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.modal-btns button{padding:6px 14px;font-size:12px;border-radius:5px;border:1px solid #00d4ff33;cursor:pointer;font-family:monospace}
+.mbtn-cancel{background:transparent;color:#7a9abf}
+.mbtn-save{background:#00d4ff22;color:#00d4ff;border-color:#00d4ff55}
+.mbtn-save:hover{background:#00d4ff44}
+</style>
+</head>
+<body>
+<div id="hq">
+
+<div id="top-bar">
+  <div id="title-hq">&#9670; YANOS — WAR MAP | MISSION 2 SEMAINES</div>
+  <div id="stats-row">
+    <div class="schip">Avancement <b id="st-pct">0%</b></div>
+    <div class="schip">Faites <b id="st-done">0</b></div>
+    <div class="schip">Urgentes <b id="st-urg">0</b></div>
+  </div>
+</div>
+
+<div id="map-wrap">
+  <!-- Canvas hologramme -->
+  <canvas id="hg-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></canvas>
+
+  <!-- Scanlines overlay -->
+  <div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(100,160,255,.04) 0px,rgba(100,160,255,.04) 1px,transparent 1px,transparent 3px);mix-blend-mode:screen;animation:hg-sld 6s linear infinite,hg-flick 5s ease-in-out infinite;"></div>
+  <!-- Vignette -->
+  <div style="position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px rgba(0,0,0,.65);"></div>
+
+  <!-- Coins HUD -->
+  <div style="position:absolute;top:8px;left:8px;width:16px;height:16px;border-top:1.5px solid #3b82f6;border-left:1.5px solid #3b82f6;opacity:.7;pointer-events:none;"></div>
+  <div style="position:absolute;top:8px;right:8px;width:16px;height:16px;border-top:1.5px solid #3b82f6;border-right:1.5px solid #3b82f6;opacity:.7;pointer-events:none;"></div>
+  <div style="position:absolute;bottom:8px;left:8px;width:16px;height:16px;border-bottom:1.5px solid #3b82f6;border-left:1.5px solid #3b82f6;opacity:.7;pointer-events:none;"></div>
+  <div style="position:absolute;bottom:8px;right:8px;width:16px;height:16px;border-bottom:1.5px solid #3b82f6;border-right:1.5px solid #3b82f6;opacity:.7;pointer-events:none;"></div>
+
+  <!-- Label top gauche -->
+  <div style="position:absolute;top:10px;left:30px;font-size:8px;letter-spacing:.18em;color:#3b82f6;opacity:.7;pointer-events:none;display:flex;align-items:center;gap:5px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 6px #3b82f6;animation:hg-blink 1.4s ease-in-out infinite;display:inline-block;"></span>
+    LIVE SECTOR SCAN
+  </div>
+
+  <!-- Coords + timer bas gauche -->
+  <div style="position:absolute;bottom:10px;left:14px;pointer-events:none;">
+    <div id="hg-coord" style="font-size:9px;letter-spacing:.12em;color:#8ab4d8;opacity:.75;">LAT +00.00  LON +000.00</div>
+  </div>
+
+  <!-- Progress bas droite -->
+  <div style="position:absolute;bottom:10px;right:14px;text-align:right;pointer-events:none;">
+    <div style="font-size:9px;letter-spacing:.16em;color:#8ab4d8;opacity:.7;margin-bottom:4px;">SCAN <span id="hg-pct" style="color:#3b82f6;">00%</span></div>
+    <div style="width:110px;height:2px;background:rgba(100,160,255,.15);border-radius:1px;overflow:hidden;margin-left:auto;">
+      <div id="hg-fill" style="height:100%;width:0%;background:#3b82f6;box-shadow:0 0 6px #3b82f6;"></div>
+    </div>
+  </div>
+
+  <!-- SVG chains (tracés de progression) -->
+  <svg id="chains-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;" viewBox="0 0 960 260" xmlns="http://www.w3.org/2000/svg">
+    <g id="chain-g"></g>
+  </svg>
+
+  <!-- Pions ROI d'échecs -->
+  <div id="pions-wrap" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">
+    <div class="pion" id="pion-d" style="left:3%;top:30%;--glow:#00d4ff">
+      <svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+        <defs><radialGradient id="gd-d" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="#60eeff"/><stop offset="100%" stop-color="#0077aa"/></radialGradient></defs>
+        <ellipse cx="14" cy="33" rx="9" ry="2.5" fill="#00d4ff" opacity=".35"/>
+        <rect x="8" y="26" width="12" height="5" rx="2" fill="url(#gd-d)" stroke="#00d4ff" stroke-width=".8"/>
+        <rect x="11" y="18" width="6" height="10" rx="1.5" fill="url(#gd-d)" stroke="#00d4ff" stroke-width=".8"/>
+        <ellipse cx="14" cy="17" rx="6" ry="4.5" fill="url(#gd-d)" stroke="#00d4ff" stroke-width=".8"/>
+        <rect x="13" y="7" width="2" height="8" rx="1" fill="#00d4ff"/>
+        <rect x="10" y="9" width="8" height="2" rx="1" fill="#00d4ff"/>
+        <ellipse cx="14" cy="33" rx="9" ry="2" fill="none" stroke="#00d4ff" stroke-width=".5" opacity=".5">
+          <animate attributeName="rx" values="9;14;9" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+        </ellipse>
+      </svg>
+    </div>
+    <div class="pion" id="pion-s" style="left:55%;top:30%;--glow:#ffaa00">
+      <svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+        <defs><radialGradient id="gd-s" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="#ffd060"/><stop offset="100%" stop-color="#aa6600"/></radialGradient></defs>
+        <ellipse cx="14" cy="33" rx="9" ry="2.5" fill="#ffaa00" opacity=".35"/>
+        <rect x="8" y="26" width="12" height="5" rx="2" fill="url(#gd-s)" stroke="#ffaa00" stroke-width=".8"/>
+        <rect x="11" y="18" width="6" height="10" rx="1.5" fill="url(#gd-s)" stroke="#ffaa00" stroke-width=".8"/>
+        <ellipse cx="14" cy="17" rx="6" ry="4.5" fill="url(#gd-s)" stroke="#ffaa00" stroke-width=".8"/>
+        <rect x="13" y="7" width="2" height="8" rx="1" fill="#ffaa00"/>
+        <rect x="10" y="9" width="8" height="2" rx="1" fill="#ffaa00"/>
+        <ellipse cx="14" cy="33" rx="9" ry="2" fill="none" stroke="#ffaa00" stroke-width=".5" opacity=".5">
+          <animate attributeName="rx" values="9;14;9" dur="2.5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.5;0;0.5" dur="2.5s" repeatCount="indefinite"/>
+        </ellipse>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var wrap = document.getElementById('map-wrap');
+  var cv   = document.getElementById('hg-canvas');
+  var ctx  = cv.getContext('2d');
+  var ACCENT = '#3b82f6';
+
+  /* Ellipses de masse terrestre (lon_center, lat_center, lon_radius, lat_radius) */
+  var LAND = [
+    /* Amérique du Nord */
+    [-100,55,32,20],[-82,48,18,16],[-122,44,10,14],[-152,64,14,8],
+    [-90,18,10,10],[-78,22,5,7],[-45,70,14,9],
+    /* Amérique du Sud */
+    [-60,-5,16,14],[-64,-28,10,14],[-70,-42,5,8],
+    /* Europe */
+    [10,52,18,10],[22,62,10,8],[-3,55,4,5],[18,42,6,6],
+    /* Afrique */
+    [18,15,22,15],[24,-10,15,16],[46,-18,3,5],[45,30,13,10],
+    /* Asie */
+    [88,52,42,18],[138,58,20,10],[78,23,10,12],
+    [105,16,10,10],[118,-2,15,7],[132,-24,15,10],[138,37,4,8],
+    /* Proche-Orient */
+    [40,28,8,7],[56,23,4,6]
+  ];
+
+  var NODES = [
+    {n:'MTL', lon:-73.6, lat:45.5},
+    {n:'NYC', lon:-74,   lat:40.7},
+    {n:'LDN', lon:-0.1,  lat:51.5},
+    {n:'PAR', lon:2.3,   lat:48.9},
+    {n:'MOS', lon:37.6,  lat:55.7},
+    {n:'DXB', lon:55.3,  lat:25.3},
+    {n:'SHA', lon:121.5, lat:31.2},
+    {n:'TYO', lon:139.7, lat:35.7},
+    {n:'SYD', lon:151.2, lat:-33.9}
+  ];
+
+  var ARCS = [
+    [0,2], /* MTL→LDN */
+    [2,3], /* LDN→PAR */
+    [3,4], /* PAR→MOS */
+    [2,6], /* LDN→SHA */
+    [5,6], /* DXB→SHA */
+    [6,7], /* SHA→TYO */
+    [0,1], /* MTL→NYC */
+    [7,8]  /* TYO→SYD */
+  ];
+
+  var latTop = 80, latSpan = 148;
+  var W, H, dots;
+
+  function hexRgb(h){ h=h.replace('#',''); return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)}; }
+  function project(lon,lat){ return [(lon+180)/360*W, (latTop-lat)/latSpan*H]; }
+  function isLand(lon,lat){
+    for(var i=0;i<LAND.length;i++){
+      var e=LAND[i], dx=(lon-e[0])/e[2], dy=(lat-e[1])/e[3];
+      if(dx*dx+dy*dy<=1) return true;
+    }
+    return false;
+  }
+
+  function resize(){
+    W = wrap.clientWidth || 960;
+    H = wrap.clientHeight || 260;
+    var dpr = Math.min(window.devicePixelRatio||1, 2);
+    cv.width = W*dpr; cv.height = H*dpr;
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    buildDots();
+  }
+
+  function buildDots(){
+    var step = Math.max(6, Math.round(W/160));
+    dots = [];
+    for(var y=step/2; y<H; y+=step){
+      for(var x=step/2; x<W; x+=step){
+        var lon = x/W*360-180;
+        var lat = latTop - y/H*latSpan;
+        dots.push({x:x, y:y, land:isLand(lon,lat), s:Math.random()*6.28});
+      }
+    }
+  }
+
+  var t0 = performance.now();
+  function p2(n){ return ('0'+n).slice(-2); }
+
+  function frame(){
+    var t = (performance.now()-t0)/1000;
+    var c = hexRgb(ACCENT), r=c.r, g=c.g, b=c.b;
+    var A = function(a){ return 'rgba('+r+','+g+','+b+','+a+')'; };
+
+    ctx.clearRect(0,0,W,H);
+
+    /* Fond dégradé */
+    var bg = ctx.createRadialGradient(W/2,H*0.4,0, W/2,H*0.4,W*0.7);
+    bg.addColorStop(0,'#0b1734'); bg.addColorStop(1,'#03060f');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    /* Grille mercator */
+    ctx.lineWidth=.5; ctx.strokeStyle=A(0.07);
+    for(var lon=-150;lon<=150;lon+=30){ var gx=(lon+180)/360*W; ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+    for(var lat2=-60;lat2<=75;lat2+=30){ var gy=(latTop-lat2)/latSpan*H; ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+
+    /* Points masse terrestre + scan */
+    var frac=(t/8)%1, sx=frac*W;
+    for(var i=0;i<dots.length;i++){
+      var d=dots[i];
+      var a = d.land ? 0.45 : 0.05;
+      var rad = d.land ? 1.4 : 0.8;
+      var dist = Math.abs(d.x - sx);
+      if(dist < 90){ var boost=1-dist/90; a += boost*(d.land?0.55:0.25); rad += boost*1.8; }
+      if(d.land){ a *= 0.75+0.25*Math.sin(t*2.2+d.s); }
+      a = Math.min(1,a);
+      if(dist<50&&d.land){
+        var m=1-dist/50;
+        ctx.fillStyle='rgba('+Math.round(r+(255-r)*m)+','+Math.round(g+(255-g)*m)+','+Math.round(b+(255-b)*m)+','+a+')';
+      } else {
+        ctx.fillStyle = A(a);
+      }
+      ctx.beginPath(); ctx.arc(d.x,d.y,rad,0,6.283); ctx.fill();
+    }
+
+    /* Arcs entre noeuds */
+    ctx.lineWidth=1;
+    for(var k=0;k<ARCS.length;k++){
+      var na=NODES[ARCS[k][0]], nb=NODES[ARCS[k][1]];
+      var pa=project(na.lon,na.lat), pb=project(nb.lon,nb.lat);
+      var mx=(pa[0]+pb[0])/2, my=(pa[1]+pb[1])/2;
+      var dd=Math.sqrt(Math.pow(pb[0]-pa[0],2)+Math.pow(pb[1]-pa[1],2));
+      var cx=mx, cy=my-dd*0.25;
+      ctx.setLineDash([4,6]); ctx.lineDashOffset=-t*20;
+      ctx.strokeStyle=A(0.2); ctx.beginPath();
+      ctx.moveTo(pa[0],pa[1]); ctx.quadraticCurveTo(cx,cy,pb[0],pb[1]); ctx.stroke();
+      ctx.setLineDash([]);
+      /* point mobile sur l'arc */
+      var p=((t*0.12)+k*0.19)%1, u=1-p;
+      var px=u*u*pa[0]+2*u*p*cx+p*p*pb[0];
+      var py=u*u*pa[1]+2*u*p*cy+p*p*pb[1];
+      ctx.fillStyle=A(0.3); ctx.beginPath(); ctx.arc(px,py,4.5,0,6.283); ctx.fill();
+      ctx.fillStyle=A(0.95); ctx.beginPath(); ctx.arc(px,py,2,0,6.283); ctx.fill();
+    }
+
+    /* Noeuds -->  reticules + labels */
+    ctx.font='9px "Share Tech Mono",monospace';
+    for(var j=0;j<NODES.length;j++){
+      var nd=NODES[j], pp=project(nd.lon,nd.lat), nx=pp[0], ny=pp[1];
+      /* pulse */
+      var rp=((t*0.45)+j*0.28)%1;
+      ctx.strokeStyle=A((1-rp)*0.75); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(nx,ny,3+rp*14,0,6.283); ctx.stroke();
+      /* réticule croix */
+      ctx.strokeStyle=A(0.6); ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(nx-7,ny);ctx.lineTo(nx-2,ny);
+      ctx.moveTo(nx+2,ny);ctx.lineTo(nx+7,ny);
+      ctx.moveTo(nx,ny-7);ctx.lineTo(nx,ny-2);
+      ctx.moveTo(nx,ny+2);ctx.lineTo(nx,ny+7);
+      ctx.stroke();
+      ctx.fillStyle=A(1); ctx.beginPath(); ctx.arc(nx,ny,2,0,6.283); ctx.fill();
+      ctx.fillStyle=A(0.85); ctx.fillText(nd.n, nx+9, ny-5);
+    }
+
+    /* HUD bas */
+    var clon=(sx/W*360-180).toFixed(2), clat=(latTop-(Math.sin(t*0.28)*0.5+0.5)*latSpan).toFixed(2);
+    var ce=document.getElementById('hg-coord');
+    if(ce) ce.textContent='LAT '+(clat>=0?'+':'')+clat+'  LON '+(clon>=0?'+':'')+clon;
+    var pct=Math.round(frac*100);
+    var fe=document.getElementById('hg-fill'); if(fe) fe.style.width=pct+'%';
+    var pe=document.getElementById('hg-pct'); if(pe) pe.textContent=(pct<10?'0':'')+pct+'%';
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', function(){ resize(); });
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+<div id="war-map"></div>
+
+<!-- OVERLAY ANIMATION FINALE -->
+<div id="anim-overlay" style="display:none;position:fixed;inset:0;z-index:999;pointer-events:none;overflow:hidden;">
+  <canvas id="fireworks-canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+  <div id="mission-msg" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+    <div style="font-family:monospace;text-align:center;">
+      <div id="mm-line1" style="font-size:11px;letter-spacing:.3em;color:#00d4ff;opacity:0;transform:translateY(20px);transition:all .6s ease;margin-bottom:12px;">// YANOS COMMAND //</div>
+      <div id="mm-line2" style="font-size:42px;font-weight:900;letter-spacing:.12em;color:#fff;text-shadow:0 0 40px #00d4ff,0 0 80px #00d4ff88;opacity:0;transform:scale(.7);transition:all .8s cubic-bezier(.2,0,.2,1.4) .4s;margin-bottom:8px;">MISSION</div>
+      <div id="mm-line3" style="font-size:42px;font-weight:900;letter-spacing:.12em;color:#00ff88;text-shadow:0 0 40px #00ff88,0 0 80px #00ff8888;opacity:0;transform:scale(.7);transition:all .8s cubic-bezier(.2,0,.2,1.4) .7s;margin-bottom:24px;">ACCOMPLISHED</div>
+      <div id="mm-line4" style="font-size:13px;letter-spacing:.2em;color:#ffaa00;opacity:0;transform:translateY(10px);transition:all .6s ease 1.2s;">LES DEUX FRONTS SONT SÉCURISÉS — RAPPORT CEO PRÊT</div>
+      <div id="mm-close" style="margin-top:32px;opacity:0;transition:opacity .5s ease 2s;pointer-events:all;">
+        <button onclick="closeWin()" style="background:#00d4ff22;border:1px solid #00d4ff88;border-radius:6px;padding:10px 28px;color:#00d4ff;font-size:12px;font-family:monospace;letter-spacing:.12em;cursor:pointer;">▶ CONTINUER LA MISSION</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERLAY CONQUÊTE DE GROUPE -->
+<div id="sector-overlay" style="display:none;position:fixed;inset:0;z-index:998;pointer-events:none;overflow:hidden;">
+  <canvas id="sector-canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+  <div id="sector-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+    <div style="font-family:monospace;text-align:center;">
+      <div id="sm-line1" style="font-size:10px;letter-spacing:.3em;color:#ffaa00;opacity:0;transform:translateY(10px);transition:all .4s ease;margin-bottom:8px;">SECTOR CLEARED</div>
+      <div id="sm-line2" style="font-size:28px;font-weight:700;letter-spacing:.1em;color:#fff;text-shadow:0 0 20px #00d4ff;opacity:0;transform:scale(.8);transition:all .5s cubic-bezier(.2,0,.2,1.3) .2s;margin-bottom:6px;"></div>
+      <div id="sm-line3" style="font-size:11px;letter-spacing:.15em;color:#00ff88;opacity:0;transition:all .4s ease .5s;">TOUTES LES TÂCHES COMPLÉTÉES</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ajout/édition cluster -->
+<div id="modal-bg">
+  <div id="modal-box">
+    <h3 id="modal-title">NOUVEAU GROUPE</h3>
+    <input id="modal-name" placeholder="Nom du groupe…">
+    <select id="modal-col">
+      <option value="cyan">Cyan — Urgent/Tracking</option>
+      <option value="amber">Amber — En cours</option>
+      <option value="green">Vert — Finalisation</option>
+    </select>
+    <select id="modal-week">
+      <option value="1">Semaine 1</option>
+      <option value="2">Semaine 2</option>
+    </select>
+    <div class="modal-btns">
+      <button class="mbtn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="mbtn-save" onclick="saveModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div id="pgbar-wrap">
+  <span class="pglbl-txt">PROGRESSION GLOBALE</span>
+  <div id="pgbar"><div id="pgfill"></div></div>
+  <span id="pglbl">0%</span>
+</div>
+
+</div>
+
+<script>
+const SK='yanos_wm_v1';
+
+const DEF=[
+  {id:'c1',name:'Tracking brisé',week:1,col:'cyan',client:'both',open:true,tasks:[
+    {id:'t1',label:'Capturer screenshot HubSpot avec source ads',done:false,urgent:true,client:'d'},
+    {id:'t2',label:'Identifier action de conversion active ce jour-là',done:false,urgent:true,client:'d'},
+    {id:'t3',label:'Vérifier tag via Google Tag Assistant',done:false,urgent:false,client:'d'},
+    {id:'t4',label:'Corriger tag — tester une conversion fictive',done:false,urgent:false,client:'d'},
+    {id:'t5',label:'Documenter la correction pour le rapport',done:false,urgent:false,client:'d'},
+  ]},
+  {id:'c2',name:'Landing page → tech',week:1,col:'cyan',client:'both',open:true,tasks:[
+    {id:'t6',label:'Préparer courriel tech avec fichiers landing page',done:false,urgent:false,client:'s'},
+    {id:'t7',label:'Envoyer et confirmer réception — noter la date',done:false,urgent:false,client:'s'},
+  ]},
+  {id:'c3',name:'Nettoyage du ciblage',week:1,col:'amber',client:'both',open:true,tasks:[
+    {id:'t8',label:'Exclure mots-clés mauvais leads (sticker véhicule…)',done:false,urgent:false,client:'d'},
+    {id:'t9',label:'Analyser termes de recherche 30-60 derniers jours',done:false,urgent:false,client:'d'},
+    {id:'t10',label:'Ajuster enchères par appareil (mobile vs desktop)',done:false,urgent:false,client:'d'},
+    {id:'t11',label:'Ajuster calendrier de diffusion selon les bons leads',done:false,urgent:false,client:'d'},
+  ]},
+  {id:'c4',name:'Tracking propre avant relance',week:1,col:'amber',client:'both',open:true,tasks:[
+    {id:'t12',label:'Auditer conversions — identifier micro-conversions inutiles',done:false,urgent:false,client:'s'},
+    {id:'t13',label:'Désactiver micro-conversions du but de conversion',done:false,urgent:false,client:'s'},
+    {id:'t14',label:'Dupliquer campagne → version propre tracking corrigé',done:false,urgent:false,client:'s'},
+    {id:'t15',label:'Valider que seules les vraies conversions comptent',done:false,urgent:false,client:'s'},
+  ]},
+  {id:'c5',name:'Finalisation Décalcorama',week:2,col:'green',client:'both',open:true,tasks:[
+    {id:'t16',label:'Révision finale annonces et extensions',done:false,urgent:false,client:'d'},
+    {id:'t17',label:'Vérifier scores de qualité',done:false,urgent:false,client:'d'},
+    {id:'t18',label:'Rapport synthèse CEO — corrections + résultats',done:false,urgent:false,client:'d'},
+  ]},
+  {id:'c6',name:'Séparation des campagnes',week:2,col:'green',client:'both',open:true,tasks:[
+    {id:'t19',label:'Créer campagne Particuliers — mots-clés + landing Persona B',done:false,urgent:false,client:'s'},
+    {id:'t20',label:'Créer campagne B2B — mots-clés + landing Persona A',done:false,urgent:false,client:'s'},
+    {id:'t21',label:'Paramétrer ciblage géo, appareils, enchères sur les 2',done:false,urgent:false,client:'s'},
+  ]},
+];
+
+let state;
+try{state=JSON.parse(localStorage.getItem(SK));if(!state||!state.length)throw 0;}catch(e){state=JSON.parse(JSON.stringify(DEF));}
+
+let dragSrc=null;
+
+function save(){try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}}
+function uid(){return 't'+Date.now()+Math.floor(Math.random()*999);}
+
+function colHex(col){return col==='cyan'?'#00d4ff':col==='amber'?'#ffaa00':'#00ff88';}
+
+function allTasks(){return state.flatMap(c=>c.tasks);}
+
+function isUnlocked(ci,ti){
+  if(ci===0&&ti===0)return true;
+  if(ti>0){
+    const prev=state[ci].tasks[ti-1];
+    return prev.done||prev.waiting;
+  }
+  if(ci>0) return state[ci-1].tasks.every(t=>t.done||t.waiting);
+  return true;
+}
+
+/* ÉTAT PRÉCÉDENT pour détecter les transitions */
+let prevClusterDone = state.map(c=>c.tasks.length>0&&c.tasks.every(t=>t.done));
+let prevAllDone = false;
+let animLock = false;
+
+function updateStats(){
+  const all=allTasks();
+  const done=all.filter(t=>t.done).length;
+  const urg=all.filter(t=>t.urgent&&!t.done).length;
+  const pct=all.length?Math.round(done/all.length*100):0;
+  document.getElementById('st-pct').textContent=pct+'%';
+  document.getElementById('st-done').textContent=done;
+  document.getElementById('st-urg').textContent=urg;
+  document.getElementById('pgfill').style.width=pct+'%';
+  document.getElementById('pglbl').textContent=pct+'%';
+
+  const allDone=all.length>0&&all.every(t=>t.done);
+
+  // Détecter complétion d'un groupe
+  state.forEach((c,ci)=>{
+    const isDone=c.tasks.length>0&&c.tasks.every(t=>t.done);
+    if(isDone && !prevClusterDone[ci] && !allDone){
+      triggerSectorAnim(c.name);
+    }
+    prevClusterDone[ci]=isDone;
+  });
+
+  // Détecter complétion totale
+  if(allDone && !prevAllDone && !animLock){
+    animLock=true;
+    setTimeout(()=>triggerFinalAnim(),600);
+  }
+  prevAllDone=allDone;
+}
+
+/* ====== ANIMATION CONQUÊTE DE GROUPE ====== */
+function triggerSectorAnim(name){
+  const ov=document.getElementById('sector-overlay');
+  const cv=document.getElementById('sector-canvas');
+  document.getElementById('sm-line2').textContent=name.toUpperCase();
+  ov.style.display='block';
+
+  // Resize canvas
+  cv.width=window.innerWidth; cv.height=window.innerHeight;
+  const ctx=cv.getContext('2d');
+
+  // Flash blanc
+  let flashA=0.35;
+  function drawFlash(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='rgba(0,212,255,'+flashA+')';
+    ctx.fillRect(0,0,cv.width,cv.height);
+    flashA-=0.018;
+    if(flashA>0) requestAnimationFrame(drawFlash);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  }
+  drawFlash();
+
+  // Burst de particules
+  const particles=[];
+  const cx=cv.width/2, cy=cv.height/2;
+  for(let i=0;i<60;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=2+Math.random()*6;
+    particles.push({
+      x:cx,y:cy,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      life:1,decay:0.02+Math.random()*0.02,
+      r:2+Math.random()*3,
+      color:['#00d4ff','#00ff88','#ffaa00','#ffffff'][Math.floor(Math.random()*4)]
+    });
+  }
+  function animParticles(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    let alive=false;
+    particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=p.decay;
+      if(p.life>0){
+        alive=true;
+        ctx.globalAlpha=p.life;
+        ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.28); ctx.fill();
+      }
+    });
+    ctx.globalAlpha=1;
+    if(alive) requestAnimationFrame(animParticles);
+  }
+  setTimeout(animParticles,80);
+
+  // Texte apparaît
+  setTimeout(()=>{
+    document.getElementById('sm-line1').style.cssText+='opacity:1;transform:translateY(0)';
+    document.getElementById('sm-line2').style.cssText+='opacity:1;transform:scale(1)';
+    document.getElementById('sm-line3').style.cssText+='opacity:1';
+  },100);
+
+  // Disparaît après 2.2s
+  setTimeout(()=>{
+    ov.style.opacity='0';
+    ov.style.transition='opacity .5s';
+    setTimeout(()=>{
+      ov.style.display='none';
+      ov.style.opacity='1';
+      ov.style.transition='';
+      document.getElementById('sm-line1').style.cssText='font-size:10px;letter-spacing:.3em;color:#ffaa00;opacity:0;transform:translateY(10px);transition:all .4s ease;margin-bottom:8px;';
+      document.getElementById('sm-line2').style.cssText='font-size:28px;font-weight:700;letter-spacing:.1em;color:#fff;text-shadow:0 0 20px #00d4ff;opacity:0;transform:scale(.8);transition:all .5s cubic-bezier(.2,0,.2,1.3) .2s;margin-bottom:6px;';
+      document.getElementById('sm-line3').style.cssText='font-size:11px;letter-spacing:.15em;color:#00ff88;opacity:0;transition:all .4s ease .5s;';
+    },500);
+  },2200);
+}
+
+/* ====== ANIMATION FINALE ====== */
+function triggerFinalAnim(){
+  const ov=document.getElementById('anim-overlay');
+  const cv=document.getElementById('fireworks-canvas');
+  ov.style.display='block';
+  cv.width=window.innerWidth; cv.height=window.innerHeight;
+  const ctx=cv.getContext('2d');
+
+  // Fond sombre progressif
+  let bgA=0;
+  const rockets=[];
+  const explosions=[];
+  let tick=0;
+
+  function spawnRocket(){
+    rockets.push({
+      x:cv.width*(.15+Math.random()*.7),
+      y:cv.height,
+      vy:-(8+Math.random()*6),
+      targetY:cv.height*(.1+Math.random()*.45),
+      color:['#00d4ff','#ffaa00','#00ff88','#ff3344','#ffffff','#aa88ff'][Math.floor(Math.random()*6)]
+    });
+  }
+
+  function explode(x,y,color){
+    const count=80+Math.floor(Math.random()*60);
+    for(let i=0;i<count;i++){
+      const angle=Math.random()*Math.PI*2;
+      const speed=1+Math.random()*7;
+      explosions.push({
+        x,y,
+        vx:Math.cos(angle)*speed,
+        vy:Math.sin(angle)*speed,
+        life:1,decay:.012+Math.random()*.018,
+        r:1.5+Math.random()*2.5,
+        color,trail:[]
+      });
+    }
+  }
+
+  function loop(){
+    tick++;
+    // Fond semi-transparent pour trainée
+    ctx.fillStyle='rgba(3,6,15,.18)';
+    ctx.fillRect(0,0,cv.width,cv.height);
+
+    // Spawn rockets
+    if(tick%18===0) spawnRocket();
+    if(tick%28===0) spawnRocket();
+
+    // Rockets
+    for(let i=rockets.length-1;i>=0;i--){
+      const r=rockets[i];
+      r.y+=r.vy;
+      ctx.fillStyle=r.color;
+      ctx.globalAlpha=.9;
+      ctx.beginPath(); ctx.arc(r.x,r.y,2,0,6.28); ctx.fill();
+      // Trainée
+      ctx.globalAlpha=.3;
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(r.x,r.y+6,1,0,6.28); ctx.fill();
+      ctx.globalAlpha=1;
+      if(r.y<=r.targetY){
+        explode(r.x,r.y,r.color);
+        rockets.splice(i,1);
+      }
+    }
+
+    // Explosions
+    for(let i=explosions.length-1;i>=0;i--){
+      const p=explosions[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=.05; p.life-=p.decay;
+      if(p.life<=0){explosions.splice(i,1);continue;}
+      ctx.globalAlpha=p.life*.9;
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,6.28); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    if(tick<380) requestAnimationFrame(loop);
+    else{
+      // Fade out canvas
+      let fA=1;
+      function fadeOut(){
+        ctx.fillStyle='rgba(3,6,15,.08)';
+        ctx.fillRect(0,0,cv.width,cv.height);
+        fA-=0.03;
+        if(fA>0) requestAnimationFrame(fadeOut);
+      }
+      fadeOut();
+    }
+  }
+
+  // Spawn initial burst
+  for(let i=0;i<5;i++) setTimeout(spawnRocket, i*200);
+  requestAnimationFrame(loop);
+
+  // Message épique
+  setTimeout(()=>{
+    document.getElementById('mm-line1').style.cssText+='opacity:1;transform:translateY(0)';
+    document.getElementById('mm-line2').style.cssText+='opacity:1;transform:scale(1)';
+    document.getElementById('mm-line3').style.cssText+='opacity:1;transform:scale(1)';
+    document.getElementById('mm-line4').style.cssText+='opacity:1;transform:translateY(0)';
+    document.getElementById('mm-close').style.opacity='1';
+  },500);
+}
+
+function closeWin(){
+  const ov=document.getElementById('anim-overlay');
+  ov.style.transition='opacity .6s';
+  ov.style.opacity='0';
+  setTimeout(()=>{
+    ov.style.display='none';
+    ov.style.opacity='1';
+    ov.style.transition='';
+    animLock=false;
+  },600);
+}
+
+/* MAP */
+function buildMapCoords(){
+  const all=allTasks();
+  const total=all.length;
+  if(!total)return[];
+  const coords=[];
+  let dIdx=0,sIdx=0;
+  all.forEach((t,i)=>{
+    const lane=t.client==='s'?1:0;
+    const yBase=lane===0?25:55;
+    const xPct=3+i*(90/Math.max(total-1,1));
+    coords.push({x:Math.min(97,xPct),y:yBase+(Math.sin(i*1.1)*8),t});
+  });
+  return coords;
+}
+
+function drawMap(){
+  const g=document.getElementById('chain-g');
+  g.innerHTML='';
+  const coords=buildMapCoords();
+  if(!coords.length)return;
+
+  coords.forEach((pt,i)=>{
+    if(i>0){
+      const p=coords[i-1];
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',p.x/100*960);line.setAttribute('y1',p.y/100*260);
+      line.setAttribute('x2',pt.x/100*960);line.setAttribute('y2',pt.y/100*260);
+      line.setAttribute('stroke',pt.t.done?'#00ff8855':'#ffffff0d');
+      line.setAttribute('stroke-width','1.5');
+      line.setAttribute('stroke-dasharray','3 3');
+      g.appendChild(line);
+    }
+    const clusterCol=state.find(c=>c.tasks.includes(pt.t));
+    const col=clusterCol?colHex(clusterCol.col):'#00d4ff';
+    const circ=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circ.setAttribute('cx',pt.x/100*960);circ.setAttribute('cy',pt.y/100*260);circ.setAttribute('r','5');
+    circ.setAttribute('fill',pt.t.done?col:'#0a0e1a');
+    circ.setAttribute('stroke',col);circ.setAttribute('stroke-width','1.5');
+    g.appendChild(circ);
+  });
+
+  updatePions(coords);
+}
+
+function updatePions(coords){
+  ['d','s'].forEach(c=>{
+    const mine=coords.filter(p=>p.t.client===c);
+    if(!mine.length)return;
+    let last=mine[0];
+    mine.forEach(p=>{if(p.t.done)last=p;});
+    const pion=document.getElementById('pion-'+c);
+    pion.style.left=last.x+'%';
+    pion.style.top=last.y+'%';
+  });
+}
+
+/* DEADLINE HELPERS */
+const RED_DAYS = 3; // jours avant deadline pour virer rouge
+
+function dlStatus(cluster){
+  if(!cluster.deadline) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const dl  = new Date(cluster.deadline); dl.setHours(0,0,0,0);
+  const days = Math.round((dl - now) / 86400000);
+  const allDone = cluster.tasks.length > 0 && cluster.tasks.every(t=>t.done);
+  if(allDone) return {cls:'dl-ok', label:'✓ FAIT', days};
+  if(days < 0) return {cls:'dl-over', label:'⚠ DÉPASSÉ '+Math.abs(days)+'j', days};
+  if(days === 0) return {cls:'dl-danger', label:'⚠ AUJOURD\'HUI', days};
+  if(days <= RED_DAYS) return {cls:'dl-danger', label:'🔴 J-'+days, days};
+  if(days <= 7) return {cls:'dl-warn', label:'🟡 J-'+days, days};
+  return {cls:'dl-ok', label:'🟢 J-'+days, days};
+}
+
+function dlBarFill(cluster){
+  const st = dlStatus(cluster);
+  if(!st) return '';
+  return `<div class="dl-bar ${st.cls}"></div>`;
+}
+
+function setDeadline(ci, val){
+  state[ci].deadline = val || null;
+  save(); render(); drawMap(); updateStats();
+}
+
+/* RENDER */
+let modalMode=null, modalTarget=null;
+
+function openModalAdd(){
+  modalMode='add'; modalTarget=null;
+  document.getElementById('modal-title').textContent='NOUVEAU GROUPE';
+  document.getElementById('modal-name').value='';
+  document.getElementById('modal-col').value='cyan';
+  document.getElementById('modal-week').value='1';
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('modal-name').focus(),80);
+}
+function openModalEditCluster(ci){
+  modalMode='edit-cluster'; modalTarget=ci;
+  const c=state[ci];
+  document.getElementById('modal-title').textContent='MODIFIER LE GROUPE';
+  document.getElementById('modal-name').value=c.name;
+  document.getElementById('modal-col').value=c.col;
+  document.getElementById('modal-week').value=String(c.week);
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('modal-name').focus(),80);
+}
+function closeModal(){
+  document.getElementById('modal-bg').classList.remove('open');
+  modalMode=null; modalTarget=null;
+}
+function saveModal(){
+  const name=document.getElementById('modal-name').value.trim();
+  if(!name)return;
+  const col=document.getElementById('modal-col').value;
+  const week=parseInt(document.getElementById('modal-week').value);
+  if(modalMode==='add'){
+    state.push({id:'c'+Date.now(),name,week,col,client:'both',open:true,tasks:[]});
+  } else if(modalMode==='edit-cluster'){
+    state[modalTarget].name=name;
+    state[modalTarget].col=col;
+    state[modalTarget].week=week;
+  }
+  save();closeModal();render();drawMap();updateStats();
+}
+document.getElementById('modal-bg').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('modal-name').addEventListener('keydown',e=>{if(e.key==='Enter')saveModal();});
+
+function startEditTask(ci,ti,labelEl){
+  const task=state[ci].tasks[ti];
+  const inp=document.createElement('input');
+  inp.className='edit-inp';
+  inp.value=task.label;
+  labelEl.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  const done=()=>{
+    const v=inp.value.trim();
+    if(v) task.label=v;
+    save();render();drawMap();
+  };
+  inp.addEventListener('blur',done);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();inp.blur();}
+    if(e.key==='Escape'){inp.value=task.label;inp.blur();}
+  });
+}
+
+function toggleUrgentTask(ci,ti){
+  const task=state[ci].tasks[ti];
+  task.urgent=!task.urgent;
+  // Si devient urgent → déplacer en tête du premier cluster
+  if(task.urgent){
+    state[ci].tasks.splice(ti,1);
+    state[0].tasks.unshift(task);
+  }
+  save();render();drawMap();updateStats();
+}
+
+function render(){
+  const wrap=document.getElementById('war-map');
+  wrap.innerHTML='';
+
+  state.forEach((cluster,ci)=>{
+    const div=document.createElement('div');
+    const st=dlStatus(cluster);
+    let clsCls='cluster';
+    if(st) clsCls+=' '+st.cls;
+    div.className=clsCls+(cluster.open===false?' collapsed':'');
+
+    const done=cluster.tasks.filter(t=>t.done).length;
+    const total=cluster.tasks.length;
+    const progTxt=done+'/'+total;
+
+    // HEADER
+    const hdr=document.createElement('div');
+    hdr.className='cluster-hdr '+cluster.col;
+
+    const meta=document.createElement('div');
+    meta.className='cluster-meta';
+    meta.style.cssText='display:flex;flex-direction:column;flex:1;gap:2px;cursor:pointer';
+    meta.innerHTML=`<span class="cluster-name">${cluster.name}</span><span class="cluster-sub">SEM. ${cluster.week}</span>`;
+    meta.addEventListener('click',()=>{cluster.open=cluster.open===false?true:false;save();render();});
+
+    const hdrActions=document.createElement('div');
+    hdrActions.style.cssText='display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0';
+
+    // Badge deadline
+    const dlBadgeHtml = st
+      ? `<span class="dl-badge ${st.cls}" title="Modifier la deadline" onclick="event.stopPropagation();document.getElementById('dl-inp-${ci}').showPicker?document.getElementById('dl-inp-${ci}').showPicker():document.getElementById('dl-inp-${ci}').click()">${st.label}</span>`
+      : `<span class="dl-badge dl-none" title="Définir une deadline" onclick="event.stopPropagation();document.getElementById('dl-inp-${ci}').showPicker?document.getElementById('dl-inp-${ci}').showPicker():document.getElementById('dl-inp-${ci}').click()">+ deadline</span>`;
+
+    const dlInputHtml = `<input type="date" id="dl-inp-${ci}" class="dl-date-inp" value="${cluster.deadline||''}" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px" onchange="setDeadline(${ci},this.value)">`;
+
+    hdrActions.innerHTML=`
+      ${dlBadgeHtml}
+      ${dlInputHtml}
+      <span class="cluster-prog">${progTxt}</span>
+      <button class="icon-btn-edit" title="Monter" onclick="event.stopPropagation();moveCluster(${ci},-1)" style="${ci===0?'opacity:.2;cursor:default':''}">↑</button>
+      <button class="icon-btn-edit" title="Descendre" onclick="event.stopPropagation();moveCluster(${ci},1)" style="${ci===state.length-1?'opacity:.2;cursor:default':''}">↓</button>
+      <button class="icon-btn-edit" title="Modifier le groupe" onclick="event.stopPropagation();openModalEditCluster(${ci})">✏️</button>
+      <button class="icon-btn-edit" title="Supprimer le groupe" onclick="event.stopPropagation();deleteCluster(${ci})" style="color:#ff334488">✕</button>
+      <span class="cluster-toggle" style="cursor:pointer" onclick="event.stopPropagation();state[${ci}].open=state[${ci}].open===false?true:false;save();render();">&#9660;</span>`;
+
+    hdr.appendChild(meta);
+    hdr.appendChild(hdrActions);
+    div.appendChild(hdr);
+
+    // Barre deadline
+    if(st){
+      const bar=document.createElement('div');
+      bar.className='dl-bar '+st.cls;
+      div.appendChild(bar);
+    }
+
+    // TASK LIST
+    const list=document.createElement('div');
+    list.className='task-list'+(cluster.open===false?' hidden':'');
+
+    cluster.tasks.forEach((task,ti)=>{
+      const unlocked=isUnlocked(ci,ti);
+      const row=document.createElement('div');
+      row.className='trow'+(task.done?' done':'')+(!unlocked&&!task.done?' locked':'');
+      row.draggable=true;
+      row.dataset.ci=ci;row.dataset.ti=ti;
+
+      const col=colHex(cluster.col);
+      const isWaiting=!!task.waiting;
+      const dotStyle=task.done?`background:${col};border-color:${col}`:isWaiting?`border-color:#aa77ff;background:#8844ff22`:`border-color:${col}`;
+      const clientBadge=task.client==='d'
+        ?'<span class="client-badge badge-d">DÉC</span>'
+        :'<span class="client-badge badge-s">SIG</span>';
+
+      row.innerHTML=`
+        <span class="drag-handle" title="Déplacer">&#8801;</span>
+        <div class="tdot" style="${dotStyle}"></div>
+        <span class="tlabel" style="${isWaiting?'color:#aa77ff;font-style:italic;':''}">${task.label}</span>
+        ${clientBadge}
+        ${isWaiting&&!task.done?'<span class="wait-badge">⏳ EN ATTENTE</span>':''}
+        ${task.urgent&&!task.done&&!isWaiting?'<span class="ubadge">URGENT</span>':''}
+        <div class="task-actions">
+          <button class="icon-btn-edit" title="Renommer" data-ci="${ci}" data-ti="${ti}">✏️</button>
+          <button class="icon-btn-edit" title="${task.urgent?'Retirer urgent':'Marquer urgent'}" data-urg="${ci}_${ti}" style="color:${task.urgent?'#ff3344':'#4a7a9b'}">!</button>
+          <button class="icon-btn-edit" title="${isWaiting?'Retirer attente':'Mettre en attente'}" data-wait="${ci}_${ti}" style="color:${isWaiting?'#aa77ff':'#4a7a9b'}">⏸</button>
+          <button class="icon-btn" title="Supprimer" data-ci="${ci}" data-ti="${ti}">&#10005;</button>
+        </div>`;
+
+      // Renommer
+      row.querySelector('[title="Renommer"]').addEventListener('click',e=>{
+        e.stopPropagation();
+        startEditTask(ci,ti,row.querySelector('.tlabel'));
+      });
+      // Toggle urgent
+      row.querySelector('[data-urg]').addEventListener('click',e=>{
+        e.stopPropagation();
+        toggleUrgentTask(ci,ti);
+      });
+      // Toggle waiting
+      row.querySelector('[data-wait]').addEventListener('click',e=>{
+        e.stopPropagation();
+        task.waiting=!task.waiting;
+        if(task.waiting) task.done=false; // pas cochée si en attente
+        save();render();drawMap();updateStats();
+      });
+      // Supprimer
+      row.querySelector('.icon-btn').addEventListener('click',e=>{
+        e.stopPropagation();
+        state[ci].tasks.splice(ti,1);
+        save();render();drawMap();updateStats();
+      });
+
+      if(unlocked){
+        row.addEventListener('click',e=>{
+          if(e.target.closest('.task-actions')||e.target.closest('.drag-handle'))return;
+          task.done=!task.done;
+          save();render();drawMap();updateStats();
+        });
+      }
+
+      row.addEventListener('dragstart',e=>{
+        dragSrc={ci,ti};row.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+      });
+      row.addEventListener('dragend',()=>row.classList.remove('dragging'));
+      row.addEventListener('dragover',e=>{e.preventDefault();row.classList.add('drag-over');});
+      row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+      row.addEventListener('drop',e=>{
+        e.preventDefault();row.classList.remove('drag-over');
+        if(!dragSrc)return;
+        if(dragSrc.ci===ci&&dragSrc.ti===ti)return;
+        const srcTask=state[dragSrc.ci].tasks.splice(dragSrc.ti,1)[0];
+        state[ci].tasks.splice(ti,0,srcTask);
+        dragSrc=null;
+        save();render();drawMap();updateStats();
+      });
+
+      list.appendChild(row);
+    });
+
+    // ADD ROW
+    const addRow=document.createElement('div');
+    addRow.className='add-row';
+    addRow.innerHTML=`
+      <input class="add-inp" placeholder="Nouvelle tâche…">
+      <button class="urg-btn" title="Urgent">! Urg</button>
+      <select class="client-sel">
+        <option value="d">DÉC</option>
+        <option value="s">SIG</option>
+      </select>
+      <button class="add-btn-sm">+ Ajouter</button>`;
+
+    const inp=addRow.querySelector('.add-inp');
+    const urgBtn=addRow.querySelector('.urg-btn');
+    const selClient=addRow.querySelector('.client-sel');
+    const addBtn=addRow.querySelector('.add-btn-sm');
+
+    urgBtn.addEventListener('click',()=>urgBtn.classList.toggle('on'));
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});
+    addBtn.addEventListener('click',doAdd);
+
+    function doAdd(){
+      const txt=inp.value.trim();if(!txt)return;
+      const isUrg=urgBtn.classList.contains('on');
+      const newTask={id:uid(),label:txt,done:false,urgent:isUrg,client:selClient.value};
+      if(isUrg){
+        // Urgent → tête du premier cluster
+        state[0].tasks.unshift(newTask);
+      } else {
+        state[ci].tasks.push(newTask);
+      }
+      inp.value='';urgBtn.classList.remove('on');
+      save();render();drawMap();updateStats();
+    }
+
+    div.appendChild(list);
+    div.appendChild(addRow);
+    wrap.appendChild(div);
+  });
+
+  // BOUTON ADD CLUSTER
+  const addWrap=document.createElement('div');
+  addWrap.id='add-cluster-wrap';
+  addWrap.innerHTML='<button id="add-cluster-btn" onclick="openModalAdd()">+ AJOUTER UN GROUPE</button>';
+  wrap.appendChild(addWrap);
+
+  updateStats();
+  drawMap();
+}
+
+function moveCluster(ci, dir){
+  const target = ci + dir;
+  if(target < 0 || target >= state.length) return;
+  const tmp = state[ci];
+  state[ci] = state[target];
+  state[target] = tmp;
+  prevClusterDone = state.map(c=>c.tasks.length>0&&c.tasks.every(t=>t.done));
+  save(); render(); drawMap(); updateStats();
+}
+
+function deleteCluster(ci){
+  if(state[ci].tasks.length>0){
+    if(!confirm('Supprimer ce groupe et ses '+state[ci].tasks.length+' tâche(s)?'))return;
+  }
+  state.splice(ci,1);
+  save();render();drawMap();updateStats();
+}
+
+render();
+</script>
+</body>
+</html>
